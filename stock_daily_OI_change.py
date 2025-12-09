@@ -13,6 +13,7 @@ from pathlib import Path
 import time
 import json
 import pytz
+from typing import Dict, List
 
 # Script directory
 SCRIPT_DIR = Path(__file__).resolve().parent
