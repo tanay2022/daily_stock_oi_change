@@ -1,0 +1,7 @@
+{
+  "functions": {
+    "api/**/*.py": {
+      "excludeFiles": "{__pycache__,*.pyc,*.pyo,*.pyd,.pytest_cache,.git,.vscode,.idea,*.md,tests,docs,examples,.env*,*.log,*.xlsx}/**"
+    }
+  }
+}
