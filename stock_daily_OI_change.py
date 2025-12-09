@@ -38,10 +38,50 @@ HEADERS = {
     "X-Requested-With": "XMLHttpRequest",
 }
 
+# Helper function to load environment values from .env file
+def load_env_values(path: Path, keys: List[str]) -> Dict[str, str]:
+    """Load environment values from .env file."""
+    if not path.exists():
+        return {}
+    result: Dict[str, str] = {}
+    try:
+        for line in path.read_text().splitlines():
+            stripped = line.strip()
+            if not stripped or stripped.startswith("#"):
+                continue
+            if "=" not in stripped:
+                continue
+            key, val = stripped.split("=", 1)
+            key = key.strip()
+            val = val.strip().strip('"').strip("'")
+            if key in keys:
+                result[key] = val
+    except Exception as exc:
+        print(f"Warning: failed to load {path}: {exc}")
+    return result
+
+
 # Telegram Configuration
 import os
-TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
-TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "")
+from typing import Dict, List
+
+# Load from .env file first (for local execution)
+_env_values = load_env_values(SCRIPT_DIR / ".env", ["TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID"])
+
+TELEGRAM_BOT_TOKEN = ""
+TELEGRAM_CHAT_ID = ""
+
+if _env_values.get("TELEGRAM_BOT_TOKEN"):
+    TELEGRAM_BOT_TOKEN = _env_values["TELEGRAM_BOT_TOKEN"]
+if _env_values.get("TELEGRAM_CHAT_ID"):
+    TELEGRAM_CHAT_ID = _env_values["TELEGRAM_CHAT_ID"]
+
+# Re-check environment variables (important for Vercel deployment)
+if not TELEGRAM_BOT_TOKEN and os.environ.get("TELEGRAM_BOT_TOKEN"):
+    TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
+if not TELEGRAM_CHAT_ID and os.environ.get("TELEGRAM_CHAT_ID"):
+    TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
+
 TELEGRAM_ENABLED = bool(TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID)
 
 if not TELEGRAM_ENABLED:
@@ -539,14 +579,31 @@ def main():
         total_oi = total_oi.replace(0, np.nan)  # Avoid division by zero
         df['Combined_CH_OI'] = ((df['Sum_PE_Change_OI'] - df['Sum_CE_Change_OI']) / total_oi).round(4)
         
+        # Sort by Combined_CH_OI descending for display
+        df_sorted = df.sort_values('Combined_CH_OI', ascending=False).reset_index(drop=True)
         
         # Generate output filename with today's date (IST)
         ist_tz = pytz.timezone('Asia/Kolkata')
         today_str = datetime.now(ist_tz).strftime("%Y-%m-%d")
-        output_file = SCRIPT_DIR / f"stock_OI_data_{today_str}.xlsx"
         
-        # Export to Excel
-        df.to_excel(output_file, index=False, engine='openpyxl')
+        # Only save Excel file when running locally (not on Vercel)
+        is_vercel = os.environ.get('VERCEL', '') == '1'
+        output_file = None
+        
+        if not is_vercel:
+            output_file = SCRIPT_DIR / f"stock_OI_data_{today_str}.xlsx"
+            # Export to Excel
+            df_sorted.to_excel(output_file, index=False, engine='openpyxl')
+            print(f"Excel file saved: {output_file}")
+        else:
+            print("Running on Vercel - Excel file output skipped")
+        
+        # Send Telegram message with top 10 (if enabled)
+        telegram_sent = False
+        if TELEGRAM_ENABLED:
+            top_10 = df_sorted.head(10)[['Symbol', 'Combined_OI', 'Combined_CH_OI']].copy()
+            telegram_message = format_telegram_message(top_10, len(df_sorted), today_str)
+            telegram_sent = send_telegram_message(telegram_message)
         
         print("=" * 60)
         print("Summary")
@@ -556,10 +613,13 @@ def main():
         if failed_symbols:
             print(f"Failed symbols: {', '.join(failed_symbols)}")
         print()
-        print(f"Output file: {output_file}")
+        if output_file:
+            print(f"Output file: {output_file}")
+        if telegram_sent:
+            print("Telegram message sent successfully")
         print()
-        print("Sample data:")
-        print(df.head(10).to_string(index=False))
+        print("Sample data (Top 10 by Combined_CH_OI):")
+        print(df_sorted.head(10).to_string(index=False))
         print()
         
         # Calculate and print total execution time
