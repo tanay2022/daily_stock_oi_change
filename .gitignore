@@ -23,8 +23,9 @@ ENV/
 *.swo
 *~
 
-# Output files
+# Output files (but keep fno_stock_list.xlsx)
 *.xlsx
+!fno_stock_list.xlsx
 *.xls
 *.csv
 
