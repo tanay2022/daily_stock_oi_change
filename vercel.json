@@ -1,7 +1,8 @@
 {
-  "functions": {
-    "api/**/*.py": {
-      "excludeFiles": "{__pycache__,*.pyc,*.pyo,*.pyd,.pytest_cache,.git,.vscode,.idea,*.md,tests,docs,examples,.env*,*.log,*.xlsx}/**"
+    "functions": {
+        "api/**/*.py": {
+            "includeFiles": "fno_stock_list.xlsx",
+            "excludeFiles": "{__pycache__,*.pyc,*.pyo,*.pyd,.pytest_cache,.git,.vscode,.idea,*.md,tests,docs,examples,.env*,*.log}/**"
+        }
     }
-  }
 }
